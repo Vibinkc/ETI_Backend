@@ -1,6 +1,7 @@
 import io
 import logging
 from typing import Any
+from urllib.parse import quote
 
 import chardet
 import openpyxl
@@ -13,14 +14,17 @@ logger = logging.getLogger(__name__)
 
 
 def _for_log(value: object) -> str:
-    """Make a user-supplied value safe to put in a log line.
+    """Percent-encode a user-supplied value so it is safe in a log line.
 
-    Upload filenames and MIME types are attacker-controlled. Without this a
-    filename containing a newline can inject fabricated entries into the log,
-    and an escape sequence can drive the terminal of whoever reads it.
-    Ordinary values pass through unchanged.
+    Upload filenames and MIME types are attacker-controlled. Encoding is what
+    makes this safe rather than filtering: a filename containing CR/LF cannot
+    forge a second log record, and an escape sequence cannot drive the terminal
+    of whoever reads the log, because every such byte becomes %0D / %0A / %1B.
+
+    Everyday punctuation is listed as safe so ordinary filenames stay readable
+    ("ETI Safety Guide (v2).docx" survives intact).
     """
-    return "".join(ch if ch.isprintable() else " " for ch in str(value))[:200]
+    return quote(str(value)[:200], safe=" ._-()[]{}+,@/")
 
 
 class DocumentProcessor:
@@ -63,11 +67,18 @@ class DocumentProcessor:
                 return DocumentProcessor._extract_from_text(file_bytes)
 
             # Try to detect and process as text if unknown
-            logger.warning(f"Unknown MIME type {_for_log(mime_type)}, attempting text extraction")
+            # NOSONAR - S5145: the value is percent-encoded by _for_log() before it
+            # reaches the logger, so CR/LF and escape sequences cannot forge a record.
+            # Sonar's taint engine only recognises its own built-in sanitisers and
+            # cannot follow a project-local one, hence the explicit marker.
+            logger.warning(  # NOSONAR
+                f"Unknown MIME type {_for_log(mime_type)}, attempting text extraction"
+            )
             return DocumentProcessor._extract_from_text(file_bytes)
 
         except Exception as e:
-            logger.error(
+            # NOSONAR - S5145: file_name and mime_type are percent-encoded by _for_log().
+            logger.error(  # NOSONAR
                 f"Error extracting text from {_for_log(file_name)} (type: {_for_log(mime_type)}): {e}"
             )
             return None
