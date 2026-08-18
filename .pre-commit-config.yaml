@@ -1,0 +1,47 @@
+# Paths here are relative to this repository root, which is the backend itself.
+# (In the monorepo this config lives one level up and every path is prefixed
+# with eti_backend/.)
+#
+# mypy and bandit run as local hooks against the project venv rather than in
+# pre-commit's isolated environments: mypy needs the real pydantic-settings and
+# sqlalchemy to avoid inventing errors, and bandit needs UTF-8 stdout because
+# its text formatter echoes source lines that contain emoji.
+#
+# Activate the venv before running:  venv/Scripts/activate  (or  . venv/bin/activate)
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.7
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+        files: ^(app|scripts|tests)/
+      - id: ruff-format
+        files: ^(app|scripts|tests)/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: python -m mypy
+        args: ["--config-file=pyproject.toml", "--pretty", "--show-error-codes"]
+        language: system
+        types: [python]
+        files: ^app/
+
+      - id: bandit
+        name: Bandit security check
+        entry: python -X utf8 -m bandit
+        args: ["-r", "app", "-c", "bandit.yml"]
+        language: system
+        pass_filenames: false
+        types: [python]
+        files: ^app/
+
+      - id: run-pytest
+        name: Run unit tests
+        entry: python -m pytest
+        args: ["tests", "-q"]
+        language: system
+        pass_filenames: false
+        types: [python]
