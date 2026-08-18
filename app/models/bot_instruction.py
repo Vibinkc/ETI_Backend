@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.timeutils import utcnow
+
 from . import Base
 
 if TYPE_CHECKING:
@@ -22,7 +24,7 @@ class BotInstruction(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True, index=True)
     content: Mapped[str] = mapped_column(Text)
     updated_by: Mapped[int | None] = mapped_column(ForeignKey("user.id"), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, onupdate=utcnow)
 
     editor: Mapped["User | None"] = relationship("User", foreign_keys=[updated_by])

@@ -1,6 +1,6 @@
 """Authentication utilities for super admin."""
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Any, cast
 
 import bcrypt
@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.timeutils import utcnow
 from app.models.user import User
 
 
@@ -81,9 +82,9 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     """Create a JWT access token."""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     # python-jose is untyped, so jwt.encode() is inferred as Any. It returns str
@@ -105,7 +106,11 @@ async def get_current_user(
     try:
         token = credentials.credentials
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str = payload.get("sub")
+        # jwt.decode returns Any, and .get() can return None for a token with no
+        # "sub" claim. Annotating it str was a lie the guard below immediately
+        # contradicts; str | None states what it actually is and narrows to str
+        # after the check.
+        email: str | None = payload.get("sub")
         if email is None:
             raise credentials_exception
     except JWTError as exc:
@@ -141,14 +146,19 @@ async def get_current_user(
     raise credentials_exception
 
 
-async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+# NOSONAR - S7503: the `async` is deliberate. FastAPI runs an `async def` dependency
+# on the event loop, but dispatches a plain `def` one to the threadpool. Dropping the
+# keyword would add a thread hop to every authenticated request to do nothing but
+# return a value already resolved by get_current_user.
+async def get_current_admin(current_user: User = Depends(get_current_user)) -> User:  # NOSONAR
     """Get the current authenticated admin (super admin or regular admin)."""
     # Both super admin and regular admin can access
     # Regular admin has is_superuser=False, super admin has is_superuser=True
     return current_user
 
 
-async def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:
+# NOSONAR - S7503: see get_current_admin above. Same FastAPI dispatch reasoning.
+async def get_current_superuser(current_user: User = Depends(get_current_user)) -> User:  # NOSONAR
     """Get the current authenticated superuser."""
     if not current_user.is_superuser:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions")

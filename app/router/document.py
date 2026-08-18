@@ -2,8 +2,9 @@ import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Annotated, cast
+from typing import Annotated, BinaryIO, cast
 
+import anyio
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import func, select
@@ -24,6 +25,19 @@ from app.services.vector_store import VectorStore
 from app.services.web_scraper import WebScraper
 
 logger = logging.getLogger(__name__)
+
+
+def _write_upload_to_disk(path: Path, source: BinaryIO) -> None:
+    """Copy an upload to disk. Blocking, so callers hand it to a worker thread."""
+    with open(path, "wb") as buffer:
+        shutil.copyfileobj(source, buffer)
+
+
+def _read_file_bytes(path: Path) -> bytes:
+    """Read a file from disk. Blocking, so callers hand it to a worker thread."""
+    with open(path, "rb") as handle:
+        return handle.read()
+
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -70,13 +84,11 @@ async def upload_document(
         # Save file temporarily to extract text/check sensitive data
         file_path = UPLOAD_DIR / cast("str", file.filename)
         # Ensure we don't overwrite blindly without checking, but for now we follow simple flow
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        await anyio.to_thread.run_sync(_write_upload_to_disk, file_path, file.file)
 
         # 1. Extract text immediately to check for sensitive data
         try:
-            with open(file_path, "rb") as f:
-                file_bytes = f.read()
+            file_bytes = await anyio.to_thread.run_sync(_read_file_bytes, file_path)
 
             processor = get_document_processor()
             # We need mime_type early
@@ -134,8 +146,7 @@ async def upload_document(
                 pass
             else:
                 # Read file bytes again if needed
-                with open(file_path, "rb") as f:
-                    file_bytes = f.read()
+                file_bytes = await anyio.to_thread.run_sync(_read_file_bytes, file_path)
                 text_content = processor.extract_text(file_bytes, document.mime_type, document.name)
 
             if not text_content:

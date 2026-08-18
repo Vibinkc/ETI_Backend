@@ -17,6 +17,7 @@ from app.core.auth import (
     verify_password,
 )
 from app.core.database import get_db
+from app.core.timeutils import utcnow
 from app.models.admin_activity import AdminActivity
 from app.models.user import User
 from app.services.activity_log import log_activity
@@ -481,7 +482,7 @@ async def list_activity(
             logger.warning(f"Ignoring unparseable activity range: {start!r} to {end!r}")
     elif period:
         span = {"day": 1, "week": 7, "month": 30}[period]
-        window = (datetime.utcnow() - timedelta(days=span), datetime.utcnow())
+        window = (utcnow() - timedelta(days=span), utcnow())
 
     if window:
         filters.append(AdminActivity.created_at >= window[0])

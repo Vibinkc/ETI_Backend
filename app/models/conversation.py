@@ -4,13 +4,15 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from app.core.timeutils import utcnow
+
 
 class Message(BaseModel):
     """Individual message in a conversation."""
 
     role: str  # "user" or "assistant"
     content: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=utcnow)
 
 
 class Conversation(BaseModel):
@@ -21,8 +23,8 @@ class Conversation(BaseModel):
     user_ip: str | None = None
     user_agent: str | None = None
     messages: list[Message] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=utcnow)
+    updated_at: datetime = Field(default_factory=utcnow)
 
     class Config:
         # RUF012: this is a Pydantic config class, not a model body. Annotating

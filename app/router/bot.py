@@ -1,7 +1,5 @@
 """Bot API router for embeddable chat widget."""
 
-from datetime import datetime
-
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -10,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.mongodb import mongodb_settings
+from app.core.timeutils import utcnow
 from app.models.conversation import Conversation, Message
 from app.router.instruction import get_system_prompt
 from app.schema.conversation import BotChatRequest, BotChatResponse
@@ -56,7 +55,7 @@ async def bot_chat(
         conversation_doc = await conversations_collection.find_one({"session_id": session_id})
 
         # Add user message
-        user_message = Message(role="user", content=bot_request.message, timestamp=datetime.utcnow())
+        user_message = Message(role="user", content=bot_request.message, timestamp=utcnow())
 
         # Generate AI response using LLM service
         llm_service = LLMService()
@@ -173,7 +172,7 @@ async def bot_chat(
                 )
 
         # Add assistant message
-        assistant_message = Message(role="assistant", content=ai_response_text, timestamp=datetime.utcnow())
+        assistant_message = Message(role="assistant", content=ai_response_text, timestamp=utcnow())
 
         # Log message content length for debugging
         logger.info(f"Saving bot response - content length: {len(ai_response_text)} chars")
@@ -211,7 +210,7 @@ async def bot_chat(
                         "messages": {"$each": [user_message.model_dump(), assistant_message.model_dump()]}
                     },
                     "$set": {
-                        "updated_at": datetime.utcnow(),
+                        "updated_at": utcnow(),
                         "website_url": bot_request.website_url or conversation_doc.get("website_url"),
                         "user_ip": bot_request.user_ip or conversation_doc.get("user_ip"),
                         "user_agent": bot_request.user_agent or conversation_doc.get("user_agent"),
@@ -260,8 +259,8 @@ async def bot_chat(
                 user_ip=bot_request.user_ip or (http_request.client.host if http_request.client else None),
                 user_agent=bot_request.user_agent or http_request.headers.get("user-agent"),
                 messages=[user_message, assistant_message],
-                created_at=datetime.utcnow(),
-                updated_at=datetime.utcnow(),
+                created_at=utcnow(),
+                updated_at=utcnow(),
             )
             await conversations_collection.insert_one(new_conversation.model_dump())
 

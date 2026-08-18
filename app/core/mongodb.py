@@ -47,7 +47,10 @@ class MongoDBSettings:
             logger.error(f"Failed to connect to MongoDB: {e}")
             return False
 
-    async def disconnect(self) -> None:
+    # NOSONAR - S7503: the caller does `await mongodb_settings.disconnect()` in the
+    # lifespan handler (app/core/manager.py). Removing `async` makes that await
+    # raise TypeError on None. Motor's close() is itself synchronous.
+    async def disconnect(self) -> None:  # NOSONAR
         """Disconnect from MongoDB."""
         if self.client:
             self.client.close()

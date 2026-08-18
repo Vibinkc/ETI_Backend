@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.mongodb import mongodb_settings
+from app.core.timeutils import utcnow
 from app.models.document import Document, DocumentChunk
 from app.models.document_query_hit import DocumentQueryHit
 from app.models.form_submission import FormSubmission
@@ -56,7 +57,7 @@ def _window_for(
         win_start, win_end = custom
         label = "previous period"
     elif period in ("day", "week", "month"):
-        win_end = datetime.utcnow()
+        win_end = utcnow()
         span = {"day": 1, "week": 7, "month": 30}[period]
         win_start = win_end - timedelta(days=span)
         label = {"day": "yesterday", "week": "last week", "month": "last month"}[period]
@@ -230,7 +231,7 @@ async def get_today_stats(
     if window:
         return await _windowed_stats(db, *window)
     try:
-        today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        today = utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
         # Total documents uploaded (all time)
         result = await db.execute(select(func.count(Document.id)))
@@ -362,7 +363,7 @@ async def get_activity_stats(
 
         # Date range and bucket size both follow the selected period, so
         # "Months" aggregates by calendar month rather than relabelling days.
-        end_date = datetime.utcnow()
+        end_date = utcnow()
         if period == "day":
             start_date = end_date - timedelta(days=7)
         elif period == "week":
@@ -454,7 +455,7 @@ async def get_visitor_stats(
         conversations_collection = db_mongo["conversations"]
 
         # Determine date range
-        end_date = datetime.utcnow()
+        end_date = utcnow()
         if period == "day":
             start_date = end_date - timedelta(days=30)  # Last 30 days
         elif period == "week":
@@ -852,7 +853,7 @@ async def get_user_activity_stats(
         conversations_collection = db_mongo["conversations"]
 
         # Determine date range
-        end_date = datetime.utcnow()
+        end_date = utcnow()
         if period == "week":
             start_date = end_date - timedelta(weeks=8)
         elif period == "month":

@@ -1,6 +1,5 @@
 """Conversation API router for managing conversations."""
 
-from datetime import datetime
 from typing import Any
 
 from bson import ObjectId
@@ -11,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.mongodb import mongodb_settings
+from app.core.timeutils import utcnow
 from app.models.form_submission import FormSubmission
 from app.schema.conversation import ConversationListResponse, ConversationSchema, MessageSchema
 
@@ -67,8 +67,8 @@ async def list_user_conversations(
                 "website_url": conv.get("website_url"),
                 "ended": conv.get("ended", False),
                 "messages": [MessageSchema(**msg) for msg in raw_messages],
-                "created_at": conv.get("created_at", datetime.utcnow()),
-                "updated_at": conv.get("updated_at", datetime.utcnow()),
+                "created_at": conv.get("created_at", utcnow()),
+                "updated_at": conv.get("updated_at", utcnow()),
             }
             conversation_list.append(conversation_data)
 
@@ -130,8 +130,8 @@ async def list_conversations(
                 "user_ip": conv.get("user_ip"),
                 "user_agent": conv.get("user_agent"),
                 "messages": [MessageSchema(**msg) for msg in conv.get("messages", [])],
-                "created_at": conv.get("created_at", datetime.utcnow()),
-                "updated_at": conv.get("updated_at", datetime.utcnow()),
+                "created_at": conv.get("created_at", utcnow()),
+                "updated_at": conv.get("updated_at", utcnow()),
             }
 
             # Add form submission data if exists
@@ -175,8 +175,8 @@ async def get_conversation(conversation_id: str, db: AsyncSession = Depends(get_
             "user_ip": conversation.get("user_ip"),
             "user_agent": conversation.get("user_agent"),
             "messages": [MessageSchema(**msg) for msg in conversation.get("messages", [])],
-            "created_at": conversation.get("created_at", datetime.utcnow()),
-            "updated_at": conversation.get("updated_at", datetime.utcnow()),
+            "created_at": conversation.get("created_at", utcnow()),
+            "updated_at": conversation.get("updated_at", utcnow()),
         }
 
         # Add form submission data if exists
@@ -249,7 +249,7 @@ async def save_conversation(
             "session_id": session_id,
             "website_url": website_url,
             "ended": ended,
-            "updated_at": datetime.utcnow(),
+            "updated_at": utcnow(),
         }
 
         if messages:
@@ -257,7 +257,7 @@ async def save_conversation(
 
         if existing and not ended:
             # Update existing ongoing conversation
-            conversation_data["created_at"] = existing.get("created_at", datetime.utcnow())
+            conversation_data["created_at"] = existing.get("created_at", utcnow())
 
             # CRITICAL FIX: Bot API uses $push to append messages correctly with full content
             # NEVER overwrite messages that were saved by bot API - it's the source of truth
@@ -351,7 +351,7 @@ async def save_conversation(
             return {"conversation_id": str(existing["_id"]), "message": "Conversation updated"}
         # Create new conversation (either no existing conversation, or existing is
         # ended, or we're ending a conversation)
-        conversation_data["created_at"] = datetime.utcnow()
+        conversation_data["created_at"] = utcnow()
         result = await conversations_collection.insert_one(conversation_data)
         return {"conversation_id": str(result.inserted_id), "message": "Conversation saved"}
 
@@ -383,7 +383,7 @@ async def end_conversation(
         else:
             query["session_id"] = session_id
 
-        update_data = {"ended": ended, "updated_at": datetime.utcnow()}
+        update_data = {"ended": ended, "updated_at": utcnow()}
 
         if messages:
             update_data["messages"] = messages

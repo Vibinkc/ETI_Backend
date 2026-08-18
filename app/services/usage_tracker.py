@@ -1,12 +1,12 @@
 """Record which documents supplied context for a query."""
 
 from collections.abc import Iterable
-from datetime import datetime
 from typing import Any
 
 from loguru import logger
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.timeutils import utcnow
 from app.models.document_query_hit import DocumentQueryHit
 
 # Retrieval always returns its top matches, falling back to a 0.01 threshold so
@@ -41,7 +41,7 @@ async def record_document_hits(
     if not unique:
         return
     try:
-        now = datetime.utcnow()
+        now = utcnow()
         for doc_id in unique:
             db.add(
                 DocumentQueryHit(
