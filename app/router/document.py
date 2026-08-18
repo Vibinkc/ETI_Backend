@@ -304,7 +304,10 @@ async def get_document_file(
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
 
-    if str(document.file_path).lower().startswith(("http://", "https://")):
+    # NOSONAR - not an outbound connection: this tests whether the stored path is a
+    # URL (scraped source) rather than a local file. Dropping "http://" would stop
+    # scraped documents being detected.
+    if str(document.file_path).lower().startswith(("http://", "https://")):  # NOSONAR
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This document was scraped from a website; open its source URL instead.",

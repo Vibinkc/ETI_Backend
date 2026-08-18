@@ -12,6 +12,17 @@ from pptx import Presentation
 logger = logging.getLogger(__name__)
 
 
+def _for_log(value: object) -> str:
+    """Make a user-supplied value safe to put in a log line.
+
+    Upload filenames and MIME types are attacker-controlled. Without this a
+    filename containing a newline can inject fabricated entries into the log,
+    and an escape sequence can drive the terminal of whoever reads it.
+    Ordinary values pass through unchanged.
+    """
+    return "".join(ch if ch.isprintable() else " " for ch in str(value))[:200]
+
+
 class DocumentProcessor:
     """Service for extracting text from various document types."""
 
@@ -52,11 +63,13 @@ class DocumentProcessor:
                 return DocumentProcessor._extract_from_text(file_bytes)
 
             # Try to detect and process as text if unknown
-            logger.warning(f"Unknown MIME type {mime_type}, attempting text extraction")
+            logger.warning(f"Unknown MIME type {_for_log(mime_type)}, attempting text extraction")
             return DocumentProcessor._extract_from_text(file_bytes)
 
         except Exception as e:
-            logger.error(f"Error extracting text from {file_name} (type: {mime_type}): {e}")
+            logger.error(
+                f"Error extracting text from {_for_log(file_name)} (type: {_for_log(mime_type)}): {e}"
+            )
             return None
 
     @staticmethod

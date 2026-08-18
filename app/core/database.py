@@ -39,10 +39,14 @@ class DBSettings(BaseSettings):
             raise ValueError(
                 "DB_USER is required in .env file. Common values: 'postgres' or your PostgreSQL username"
             )
-        # Password can be empty if PostgreSQL user has no password
-        password_part = f":{self.db_password}" if self.db_password else ""
+        if not self.db_password:
+            raise ValueError(
+                "DB_PASSWORD is required in .env file. Building the URL without one "
+                "connects to an unprotected database."
+            )
         return (
-            f"postgresql+asyncpg://{self.db_user}{password_part}@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
         )
 
 
